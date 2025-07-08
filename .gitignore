@@ -137,3 +137,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+/mern-auth-assets.zip
+/mern-auth-assets/
+/.idea/
