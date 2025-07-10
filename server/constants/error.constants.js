@@ -8,6 +8,7 @@ export const AUTH_ERRORS = {
   ACCOUNT_ALREADY_VERIFIED: "Account already verified",
   INVALID_OTP: "Invalid OTP provided",
   OTP_EXPIRED: "OTP has expired",
+  REQUIRED_ALL_FIELDS: "All fields are required"
 };
 
 export const USER_ERRORS = {
