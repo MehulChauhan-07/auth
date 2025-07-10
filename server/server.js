@@ -1,9 +1,10 @@
 import express from 'express';
 import 'dotenv/config';
 import cors from 'cors';
-import authRouter from './routes/authRoutes.js';
+import authRouter from './routes/auth.routes.js';
 import cookieparser from 'cookie-parser';
-import connectDB from './config/db.js';
+import connectDB from './config/db.config.js';
+import userRouter from './routes/user.routes.js';
 const app = express();
 
 app.use(express.json());
@@ -16,7 +17,8 @@ connectDB();
 app.get("/", (req, res) => {
     res.send("Hello, World!");
 });
-app.use("/api/auth",authRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/user", userRouter);
 
 const PORT = process.env.PORT;
 
