@@ -7,9 +7,10 @@ import connectDB from './config/db.config.js';
 import userRouter from './routes/user.routes.js';
 const app = express();
 
+// middleware
 app.use(express.json());
-app.use(cookieparser())
-app.use(cors({credentials: true}));
+app.use(cookieparser());
+app.use(cors({ credentials: true }));
 
 connectDB();
 
@@ -24,5 +25,5 @@ const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT} to see the app.`);
+    console.log(`Visit http://localhost:${PORT}`);
 });
