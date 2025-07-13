@@ -8,7 +8,11 @@ import {
   generateOTP,
   generateToken,
 } from "../services/auth.services.js";
-import { sendWelcomeEmail , sendEmail, sendOTPEmail} from "../services/email.services.js";
+import {
+  sendWelcomeEmail,
+  sendEmail,
+  sendOTPEmail,
+} from "../services/email.services.js";
 import { AUTH_ERRORS } from "../constants/error.constants.js";
 
 export const register = async (req, res) => {
@@ -176,12 +180,10 @@ export const verifyOtp = async (req, res) => {
     }
 
     if (user.isAccountVerified) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: AUTH_ERRORS.ACCOUNT_ALREADY_VERIFIED,
-        });
+      return res.status(400).json({
+        success: false,
+        message: AUTH_ERRORS.ACCOUNT_ALREADY_VERIFIED,
+      });
     }
 
     if (user.verifyOtp !== otp || Date.now() > user.otpExpires) {
@@ -215,21 +217,26 @@ export const isAuthenticated = async (req, res) => {
 };
 
 export const sendResetPasswordOtp = async (req, res) => {
+  console.log("Reset password OTP request received:", req.body);
   const { email } = req.body;
 
   if (!email) {
+    console.log("Email is missing in the request");
     return res
       .status(400)
       .json({ success: false, message: "Email is required" });
   }
 
   try {
+    console.log(`Looking up user with email: ${email}`);
     const user = await userModel.findOne({ email });
     if (!user) {
+      console.log(`User not found for email: ${email}`);
       return res
         .status(404)
         .json({ success: false, message: AUTH_ERRORS.USER_NOT_FOUND });
     }
+    console.log(`User found: ${user._id}`);
 
     // const otp = String(Math.floor(100000 + Math.random() * 900000)); // Generate a 6-digit OTP
     const otp = generateOTP();
@@ -240,10 +247,25 @@ export const sendResetPasswordOtp = async (req, res) => {
     await user.save();
 
     // Send OTP email using service
-    await sendOTPEmail(user, otp, "reset");
+    console.log(`Sending OTP ${otp} to user ${user.email} for password reset`);
+
+    try {
+      await sendOTPEmail(user, otp, "reset");
+      console.log("OTP email sent successfully");
+    } catch (emailError) {
+      console.error("Failed to send OTP email:", emailError);
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: "Failed to send OTP email",
+          error: emailError.message,
+        });
+    }
 
     return res.json({ success: true, message: "OTP sent to your email" });
   } catch (error) {
+    console.error("Error in sendResetPasswordOtp:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

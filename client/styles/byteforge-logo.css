@@ -1,0 +1,9 @@
+#byteforge-logo {
+    filter: invert(0%);
+}
+
+@media (prefers-color-scheme: dark) {
+    #byteforge-logo {
+        filter: invert(100%);
+    }
+}
