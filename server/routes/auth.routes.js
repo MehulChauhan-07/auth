@@ -26,5 +26,12 @@ authRouter.post("/verify", userAuth, verifyOtp);
 authRouter.post("/is-authenticated", userAuth, isAuthenticated);
 authRouter.post("/forgot-password", sendResetPasswordOtp);
 authRouter.post("/reset-password", resetPassword);
+// Add this route to your auth routes
+authRouter.get("/csrf-token", (req, res) => {
+  res.json({
+    success: true,
+    csrfToken: req.csrfToken(),
+  });
+});
 
 export default authRouter;
