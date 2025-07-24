@@ -1,12 +1,4 @@
-<<<<<<< Updated upstream
-import express from 'express';
-import 'dotenv/config';
-import cors from 'cors';
-import authRouter from './routes/auth.routes.js';
-import cookieparser from 'cookie-parser';
-import connectDB from './config/db.config.js';
-import userRouter from './routes/user.routes.js';
-=======
+
 import express from "express";
 import "dotenv/config";
 import cors from "cors";
@@ -24,14 +16,16 @@ import csrfProtection, {
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import mfaRouter from "./routes/mfa.routes.js";
->>>>>>> Stashed changes
+
+
 const app = express();
+
+const allowedOrigins = [process.env.FRONTEND_URL, "http://localhost:5173"];
 
 // middleware
 app.use(helmet());
 app.use(express.json());
 app.use(cookieparser());
-<<<<<<< Updated upstream
 app.use(cors({ credentials: true }));
 =======
 app.use(express.urlencoded({ extended: true }));
@@ -53,7 +47,7 @@ if (process.env.NODE_ENV === "development") {
 } else {
   app.use(cors({ credentials: true, origin: allowedOrigins }));
 }
->>>>>>> Stashed changes
+
 
 connectDB();
 
@@ -68,17 +62,27 @@ app.get("/api/csrf-token", (req, res) => {
 
 // API endpoints
 app.get("/", (req, res) => {
-    res.send("Hello, World!");
+  res.send("Hello, World!");
+});
+
+// Endpoint to check if server is accessible and properly configured
+app.get("/api/status", (req, res) => {
+  const serverInfo = {
+    status: "running",
+    timestamp: new Date().toISOString(),
+    config: {
+      environment: process.env.NODE_ENV,
+      frontendUrl: process.env.FRONTEND_URL,
+      emailConfigured: !!process.env.SMTP_USER && !!process.env.SMTP_PASS,
+    },
+  };
+  res.json(serverInfo);
 });
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/mfa", mfaRouter);
 
-<<<<<<< Updated upstream
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT}`);
-});
+
 =======
 // Global error handler
 app.use((err, req, res, next) => {
@@ -102,4 +106,3 @@ app.listen(process.env.PORT, () => {
 });
 
 export default app;
->>>>>>> Stashed changes

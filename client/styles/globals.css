@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-light: 0 0% 100%;
+  --background-dark: 0 0% 3.9%;
+  --foreground-light: 0 0% 3.9%;
+  --foreground-dark: 0 0% 98%;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: hsl(var(--background-light));
+  color: hsl(var(--foreground-light));
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.dark {
+  background-color: hsl(var(--background-dark));
+  color: hsl(var(--foreground-dark));
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 30px;
+  min-height: 30px;
+  background-image: url(slide_icon.svg);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
