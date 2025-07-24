@@ -1,3 +1,10 @@
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+# auth
+=======
+<<<<<<< Updated upstream
+=======
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28
 # 🔐 Auth Backend API
 
 <div align="center">
@@ -372,11 +379,120 @@ if (pm.response.code === 200) {
 
 **Body (JSON):**
 ```json
+<<<<<<< HEAD
+=======
+# Auth System
+
+A comprehensive authentication system built with Node.js, Express, and MongoDB.
+
+## Features
+
+- **User Authentication**
+  - Registration with email verification
+  - Login with rate limiting and account lockout
+  - Password reset with OTP
+  - Remember Me functionality
+  - Refresh token mechanism
+
+- **Security**
+  - JWT authentication
+  - CSRF protection
+  - Password hashing with bcrypt
+  - Rate limiting
+  - Account lockout after failed attempts
+  - HTTP-only cookies
+
+- **Session Management**
+  - View active sessions
+  - Terminate specific sessions
+  - Logout from all devices
+
+## Tech Stack
+
+- **Backend**: Node.js, Express.js
+- **Database**: MongoDB with Mongoose
+- **Caching**: Redis
+- **Authentication**: JWT
+- **Password Hashing**: bcrypt
+- **Validation**: Joi
+- **Logging**: Winston
+- **Testing**: Mocha, Chai, Sinon
+
+## Installation
+
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/auth.git
+cd auth
+```
+
+2. Install dependencies
+```bash
+npm install
+```
+
+3. Set up environment variables
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+4. Start the server
+```bash
+npm run dev # for development
+npm start # for production
+```
+
+## API Documentation
+
+### Authentication Endpoints
+
+#### Register User
+```http
+POST /api/auth/register
+Content-Type: application/json
+
+{
+  "name": "mehulsinh chauhan",
+  "email": "mehul@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+#### Login User
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "mehul@example.com",
+  "password": "SecurePassword123!",
+  "rememberMe": true
+}
+```
+
+#### Logout User
+```http
+POST /api/auth/logout
+```
+
+#### Verify Email OTP
+```http
+POST /api/auth/verify-otp
+Content-Type: application/json
+
+>>>>>>> Stashed changes
+=======
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28
 {
   "otp": "123456"
 }
 ```
 
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+=======
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28
 **Expected Response (200):**
 ```json
 {
@@ -431,11 +547,25 @@ if (pm.response.code === 200) {
 
 **Body (JSON):**
 ```json
+<<<<<<< HEAD
+=======
+#### Password Reset Request
+```http
+POST /api/auth/forgot-password
+Content-Type: application/json
+
+>>>>>>> Stashed changes
+=======
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28
 {
   "email": "mehul@example.com"
 }
 ```
 
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+=======
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28
 **Expected Response (200):**
 ```json
 {
@@ -873,4 +1003,73 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ by [Mehul Chauhan](https://github.com/MehulChauhan-07)**
 
+<<<<<<< HEAD
 </div>
+=======
+#### Reset Password with OTP
+```http
+POST /api/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "mehul@example.com",
+  "otp": "123456",
+  "newPassword": "NewSecurePassword123!"
+}
+```
+
+### Session Management Endpoints
+
+#### Get User Sessions
+```http
+GET /api/sessions
+```
+
+#### Terminate Session
+```http
+DELETE /api/sessions/:sessionId
+```
+
+#### Terminate All Sessions
+```http
+DELETE /api/sessions
+```
+
+## Security Considerations
+
+- **Password Policy**: Passwords must be at least 8 characters and include uppercase, lowercase, numbers, and special characters.
+- **Rate Limiting**: Login attempts are rate limited to prevent brute force attacks.
+- **Account Lockout**: Accounts are temporarily locked after 5 failed login attempts.
+- **Token Security**: JWTs are stored in HTTP-only cookies and protected against XSS and CSRF attacks.
+- **Data Validation**: All input is validated using Joi validation schemas.
+
+## Development
+
+### Running Tests
+```bash
+npm test
+```
+
+### Code Linting
+```bash
+npm run lint
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
+=======
+</div>
+>>>>>>> 7a1450bc4a5ac79c660b42e6437c8a5f08be7a28

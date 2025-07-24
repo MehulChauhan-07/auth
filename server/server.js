@@ -27,7 +27,6 @@ app.use(helmet());
 app.use(express.json());
 app.use(cookieparser());
 app.use(cors({ credentials: true }));
-=======
 app.use(express.urlencoded({ extended: true }));
 app.use(apiLimiter);
 
@@ -83,7 +82,6 @@ app.use("/api/user", userRouter);
 app.use("/api/mfa", mfaRouter);
 
 
-=======
 // Global error handler
 app.use((err, req, res, next) => {
   console.error("Global error handler caught:", err);
