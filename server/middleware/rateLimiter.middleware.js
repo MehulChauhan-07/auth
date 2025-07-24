@@ -12,9 +12,11 @@ export const loginLimiter = rateLimit({
     success: false,
     message: AUTH_ERRORS.TOO_MANY_ATTEMPTS,
   },
+  // Use a safe key generator that doesn't directly manipulate IP addresses
   keyGenerator: (req) => {
-    // Use IP address and email as the key
-    return `${req.ip}-${req.body.email}`;
+    const ip = req.ip || req.connection.remoteAddress || "0.0.0.0";
+    const email = req.body?.email || "anonymous";
+    return `${ip}-${email}`;
   },
 });
 
@@ -28,4 +30,5 @@ export const apiLimiter = rateLimit({
     success: false,
     message: "Too many requests, please try again later",
   },
+  // Default keyGenerator will be used (which is safe)
 });

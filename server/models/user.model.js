@@ -65,6 +65,28 @@ const userSchema = new mongoose.Schema({
       },
     },
   ],
+
+  // Social auth fields
+  socialAuth: {
+    google: {
+      id: String,
+      email: String,
+      name: String,
+      picture: String,
+    },
+    // facebook: {
+    //   id: String,
+    //   email: String,
+    //   name: String,
+    //   picture: String,
+    // },
+    github: {
+      id: String,
+      email: String,
+      name: String,
+      picture: String,
+    },
+  },
 });
 // Add methods to the user schema
 userSchema.methods.incrementLoginAttempts = async function () {

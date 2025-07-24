@@ -1,4 +1,3 @@
-
 import express from "express";
 import "dotenv/config";
 import cors from "cors";
@@ -6,17 +5,22 @@ import cookieparser from "cookie-parser";
 import connectDB from "./config/db.config.js";
 import logger from "./utils/logger.js";
 import helmet from "helmet";
-import { apiLimiter } from "./middleware/rateLimiter.middleware.js";
+// import { apiLimiter } from "./middleware/rateLimiter.middleware.js";
 import csrfProtection, {
   handleCsrfError,
 } from "./middleware/csrf.middleware.js";
+import passport from "./config/passport.config.js";
+import session from "express-session";
+import MongoStore from "connect-mongo";
 
 // routes
-// import sessionRouter from "./routes/session.routes.js";
+import sessionRouter from "./routes/session.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import mfaRouter from "./routes/mfa.routes.js";
-
+import oauthRouter from "./routes/oauth.routes.js";
+import { apiLimiter, loginLimiter } from "./middleware/rateLimiter.middleware.js";
+// import passport from "passport";
 
 const app = express();
 
@@ -47,12 +51,33 @@ if (process.env.NODE_ENV === "development") {
   app.use(cors({ credentials: true, origin: allowedOrigins }));
 }
 
-
 connectDB();
 
 // apply CSRF protection middleware
 app.use(csrfProtection);
 app.use(handleCsrfError);
+
+// ⚠️ IMPORTANT: Session middleware must be configured BEFORE passport initialization
+// Session configuration - with explicit mongoUrl
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGODB_URL, // Make sure this is correct and defined
+    collectionName: 'sessions',
+    ttl: 60 * 60 * 24 // 1 day in seconds
+  }),
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 1 day in milliseconds
+  }
+}));
+
+// Initialize Passport strategies
+app.use(passport.initialize());
+app.use(passport.session());
 
 // generate CSRF token for each request
 app.get("/api/csrf-token", (req, res) => {
@@ -77,10 +102,12 @@ app.get("/api/status", (req, res) => {
   };
   res.json(serverInfo);
 });
+app.use("/api", apiLimiter); // Apply API rate limiter to specific route
 app.use("/api/auth", authRouter);
+app.use("/api/auth", oauthRouter);
 app.use("/api/user", userRouter);
 app.use("/api/mfa", mfaRouter);
-
+app.use("/api/session", sessionRouter);
 
 // Global error handler
 app.use((err, req, res, next) => {
