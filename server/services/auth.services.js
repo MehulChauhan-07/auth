@@ -17,6 +17,31 @@ export const verifyToken = (token) => {
   }
 };
 
+// new refresh token 
+// Generate refresh token
+export const generateRefreshToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.REFRESH_TOKEN_SECRET, {
+    expiresIn: '7d', // Refresh tokens last longer
+  });
+};
+
+// Verify refresh token
+export const verifyRefreshToken = (token) => {
+  try {
+    return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
+  } catch (error) {
+    throw new Error(AUTH_ERRORS.INVALID_REFRESH_TOKEN);
+  }
+};
+
+// Generate token pair (access + refresh)
+export const generateTokenPair = (userId) => {
+  return {
+    accessToken: generateToken(userId),
+    refreshToken: generateRefreshToken(userId),
+  };
+};
+
 export const hashPassword = async (password) => {
   return await bcrypt.hash(password, 10);
 };
