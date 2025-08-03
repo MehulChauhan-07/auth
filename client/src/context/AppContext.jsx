@@ -1,7 +1,8 @@
 import axios from "axios";
 import React, { createContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import {AuthProvider, useAuth} from "./AuthProvider.jsx";
+import {AuthProvider} from "./AuthProvider.jsx";
+import { useAuth } from "../hooks/useAuth.jsx";
 
 export const AppContext = createContext();
 
@@ -9,7 +10,7 @@ export const AppContext = createContext();
 axios.defaults.withCredentials = true;
 
 export const AppContextProvider = ({ children }) => {
-  const auth = useAuth();
+  // const auth = useAuth();
 
   // const backendUrl =
   //   import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
@@ -72,7 +73,7 @@ export const AppContextProvider = ({ children }) => {
   // };
 
     const value = {
-      ...auth,
+      // ...auth,
     }
   return <AppContext.Provider value={value}>
     {children}

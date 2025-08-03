@@ -1,3 +1,4 @@
+// import { date, string } from "joi";
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
@@ -47,6 +48,16 @@ const userSchema = new mongoose.Schema({
     default: null,
   },
 
+  // refresh token fields
+  refreshToken: {
+    type: String,
+    default: null,
+  },
+  refreshTokenCreatedAt: {
+    type: Date,
+    default: null,
+  },
+
   // MFA related fields
   mfaEnabled: {
     type: Boolean,
@@ -66,6 +77,17 @@ const userSchema = new mongoose.Schema({
     },
   ],
 
+  // active session fields
+  activeSessions: [
+    {
+      deviceInfo: String,
+      ipAddress: String,
+      lastActive: Date,
+      userAgent: String,
+      tokenIdentifier: String,
+    },
+  ],
+
   // Social auth fields
   socialAuth: {
     google: {
@@ -74,12 +96,6 @@ const userSchema = new mongoose.Schema({
       name: String,
       picture: String,
     },
-    // facebook: {
-    //   id: String,
-    //   email: String,
-    //   name: String,
-    //   picture: String,
-    // },
     github: {
       id: String,
       email: String,
@@ -88,6 +104,7 @@ const userSchema = new mongoose.Schema({
     },
   },
 });
+
 // Add methods to the user schema
 userSchema.methods.incrementLoginAttempts = async function () {
   // Increment login attempts
@@ -105,9 +122,36 @@ userSchema.methods.incrementLoginAttempts = async function () {
 // Add compound index for auth lookups
 userSchema.index({ email: 1, accountLocked: 1 });
 
+userSchema.methods.resetLoginAttempts = async function () {
+  this.loginAttempts = 0;
+  this.accountLocked = false;
+  this.lockUntil = null;
+
+  await this.save();
+};
+
+// Add device to active sessions
+userSchema.methods.addSession = async function (sessionData) {
+  // Limit to last 10 sessions
+  if (this.activeSessions.length >= 10) {
+    // Remove the oldest session
+    this.activeSessions.shift();
+  }
+
+  this.activeSessions.push(sessionData);
+  await this.save();
+};
+
+// Remove a session by identifier
+userSchema.methods.removeSession = async function (tokenIdentifier) {
+  this.activeSessions = this.activeSessions.filter(
+    (session) => session.tokenIdentifier !== tokenIdentifier
+  );
+  await this.save();
+};
+
 // Add index for social auth lookups
 userSchema.index({ "socialAuth.google.id": 1 });
-userSchema.index({ "socialAuth.facebook.id": 1 });
 userSchema.index({ "socialAuth.github.id": 1 });
 
 // Add TTL index for OTP expiration
@@ -116,13 +160,7 @@ userSchema.index({ resetOtpExpireAt: 1 }, { expireAfterSeconds: 0 });
 
 // Add text index for search functionality
 userSchema.index({ name: "text", email: "text" });
-userSchema.methods.resetLoginAttempts = async function () {
-  this.loginAttempts = 0;
-  this.accountLocked = false;
-  this.lockUntil = null;
 
-  return await this.save();
-};
 const userModal = mongoose.models.user || mongoose.model("User", userSchema);
 
 export default userModal;

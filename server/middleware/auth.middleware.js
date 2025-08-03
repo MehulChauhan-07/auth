@@ -1,9 +1,10 @@
 import jwt from "jsonwebtoken";
 import { AUTH_ERRORS } from "../constants/error.constants.js";
 
-const authMiddleware = async (req, res, next) => {
+const userAuth = async (req, res, next) => {
   // Check for token in cookies, auth header, or request body
-  let token = req.cookies.token;
+  let token = req.cookies?.token;
+  let refreshToken = req.cookies?.refreshToken;
 
   if (
     !token &&
@@ -13,7 +14,7 @@ const authMiddleware = async (req, res, next) => {
     token = req.headers.authorization.split(" ")[1];
   }
 
-  if (!token && req.body.token) {
+  if (!token && req.body?.token) {
     token = req.body.token;
   }
 
@@ -29,6 +30,10 @@ const authMiddleware = async (req, res, next) => {
 
     if (tokenDecode.id) {
       req.user = { userId: tokenDecode.id };
+      // Track current session ID for session management
+      if (refreshToken) {
+        req.currentSessionId = refreshToken.substring(refreshToken.length - 20);
+      }
     } else {
       return res.status(401).json({
         success: false,
@@ -38,10 +43,18 @@ const authMiddleware = async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Token validation error:", error.message);
+    // If token is expired but refresh token exists, return special code
+    if (error.name === "TokenExpiredError" && refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: AUTH_ERRORS.INVALID_TOKEN,
+        tokenExpired: true,
+      });
+    }
     res
       .status(401)
       .json({ success: false, message: AUTH_ERRORS.INVALID_TOKEN });
   }
 };
 
-export default authMiddleware;
+export default userAuth;

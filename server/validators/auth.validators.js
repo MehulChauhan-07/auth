@@ -31,6 +31,7 @@ const loginSchema = Joi.object({
   password: Joi.string().required().messages({
     "any.required": "Password is required",
   }),
+  rememberMe: Joi.boolean().optional(),
 });
 
 const resetPasswordSchema = Joi.object({
@@ -68,10 +69,17 @@ export const validateRegister = (req, res, next) => {
 };
 
 export const validateLogin = (req, res, next) => {
+  // Debug logging
+  console.log(
+    "🔍 Login validation - Request body:",
+    JSON.stringify(req.body, null, 2)
+  );
+
   const { error } = loginSchema.validate(req.body, { abortEarly: false });
 
   if (error) {
     const errorMessages = error.details.map((detail) => detail.message);
+    console.log("❌ Login validation failed:", errorMessages);
     return res.status(400).json({
       success: false,
       message: "Validation failed",
@@ -79,6 +87,7 @@ export const validateLogin = (req, res, next) => {
     });
   }
 
+  console.log("✅ Login validation passed");
   next();
 };
 

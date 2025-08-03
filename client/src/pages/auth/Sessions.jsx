@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthProvider";
+import { useAuth } from "../../hooks/useAuth";
 import { toast } from "react-toastify";
 import { format, formatDistanceToNow } from "date-fns";
 

@@ -1,90 +1,95 @@
+// src/pages/auth/LoginPage.jsx
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
-import { useAuth } from "../../context/AuthProvider";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/card";
+import { Alert, AlertDescription } from "../../components/ui/alert";
+import { Separator } from "../../components/ui/separator";
+import { AlertCircle, Check, Loader, Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router-dom";
 import { assets } from "../../assets/assets";
 
-export const Login = () => {
-  const navigate = useNavigate();
-  const { login, oauthLogin, verifyMfa, isLoggedIn } = useAuth();
-
-  const [formType, setFormType] = useState("Sign In");
+const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // MFA related states
   const [showMfa, setShowMfa] = useState(false);
   const [userId, setUserId] = useState("");
-  const [mfaToken, setMfaToken] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [backupCode, setBackupCode] = useState("");
-  const [mfaEmail, setMfaEmail] = useState("");
-  const [mfaPassword, setMfaPassword] = useState("");
+
+  const navigate = useNavigate();
+  const { user, login, verifyMfaLogin, oauthLogin } = useAuth();
 
   useEffect(() => {
-    // If user is already logged in, redirect to home
-    if (isLoggedIn) {
-      navigate("/");
+    if (user) {
+      navigate("/dashboard");
     }
-  }, [isLoggedIn, navigate]);
+  }, [user, navigate]);
 
-  const handleLoginSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setError("");
+    setIsLoading(true);
 
     try {
-      const result = await login(email, password, rememberMe);
+      const result = await login({ email, password, rememberMe });
 
       if (result.success) {
         if (result.mfaRequired) {
-          // Show MFA verification screen
           setShowMfa(true);
           setUserId(result.userId);
-          setMfaEmail(result.email);
-          setMfaPassword(result.password);
-          toast.info("Please enter the authentication code from your app");
         } else {
-          // Regular login successful
-          toast.success("Login successful!");
-          navigate("/");
+          navigate("/dashboard");
         }
       } else {
-        toast.error(result.message || "Login failed");
+        setError(result.message || "Login failed");
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      toast.error(
-        error.response?.data?.message || "An error occurred during login"
-      );
+    } catch (err) {
+      setError(err.message || "An error occurred");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const handleMfaSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setError("");
+    setIsLoading(true);
 
     try {
-      const result = useBackupCode
-        ? await verifyMfa(mfaEmail, mfaPassword, null, backupCode)
-        : await verifyMfa(mfaEmail, mfaPassword, mfaToken);
+      let result;
+
+      if (useBackupCode) {
+        result = await verifyMfaLogin(userId, null, backupCode);
+      } else {
+        result = await verifyMfaLogin(userId, mfaCode);
+      }
 
       if (result.success) {
-        toast.success("Authentication successful!");
-        navigate("/");
+        navigate("/dashboard");
       } else {
-        toast.error(result.message || "Authentication failed");
+        setError(result.message || "MFA verification failed");
       }
-    } catch (error) {
-      console.error("MFA verification error:", error);
-      toast.error(
-        error.response?.data?.message || "An error occurred during verification"
-      );
+    } catch (err) {
+      setError(err.message || "An error occurred");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -92,215 +97,261 @@ export const Login = () => {
     oauthLogin(provider);
   };
 
-  // Handle showing backup code form
-  const toggleBackupCode = () => {
-    setUseBackupCode(!useBackupCode);
-    setMfaToken("");
-    setBackupCode("");
-  };
-
   if (showMfa) {
     return (
-      <div className="flex items-center justify-center min-h-screen px-6 sm:px-0 bg-gradient-to-br from-blue-200 to-purple-400">
-        <img
-          onClick={() => navigate("/")}
-          src={assets.logo}
-          alt=""
-          className="absolute left-5 top-5 sm:left-20 w-28 sm:w-32 cursor-pointer"
-        />
-        <div className="bg-slate-900 p-10 rounded-lg shadow-lg w-full sm:w-96 text-indigo-300 text-sm">
-          <h2 className="text-3xl font-semibold text-white text-center mb-3">
-            Two-Factor Authentication
-          </h2>
-          <p className="text-center text-sm mb-6">
-            {useBackupCode
-              ? "Enter a backup code from your list"
-              : "Enter the 6-digit code from your authenticator app"}
-          </p>
+      <div className="flex min-h-screen bg-muted/20">
+        <div className="flex flex-col justify-center flex-1 px-4 py-12 sm:px-6 lg:px-8">
+          <div className="w-full max-w-sm mx-auto">
+            <h2 className="mt-6 text-2xl font-bold text-center text-gray-900">
+              Two-Factor Authentication
+            </h2>
+            <p className="mt-2 text-sm text-center text-gray-600">
+              {useBackupCode
+                ? "Enter a backup code"
+                : "Enter the code from your authenticator app"}
+            </p>
 
-          <form onSubmit={handleMfaSubmit}>
-            {!useBackupCode ? (
-              <div className="mb-4 flex items-center gap-3 w-full px-5 py-2.5 bg-[#333A5C] rounded-full">
-                <img src={assets.shield_icon} alt="" />
-                <input
-                  onChange={(e) => setMfaToken(e.target.value)}
-                  value={mfaToken}
-                  type="text"
-                  placeholder="Authentication code"
-                  className="bg-transparent outline-none w-full"
-                  required
-                  maxLength={6}
-                  pattern="[0-9]{6}"
-                />
+            <form onSubmit={handleMfaSubmit} className="mt-6 space-y-6">
+              {error && (
+                <div className="flex items-center p-3 text-sm text-red-800 border border-red-300 rounded-md bg-red-50">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {!useBackupCode ? (
+                <div>
+                  <label
+                    htmlFor="mfaCode"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Authentication Code
+                  </label>
+                  <Input
+                    id="mfaCode"
+                    name="mfaCode"
+                    type="text"
+                    value={mfaCode}
+                    onChange={(e) =>
+                      setMfaCode(
+                        e.target.value.replace(/\D/g, "").substring(0, 6)
+                      )
+                    }
+                    placeholder="6-digit code"
+                    required
+                    maxLength={6}
+                    pattern="\d{6}"
+                    className="mt-1"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label
+                    htmlFor="backupCode"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Backup Code
+                  </label>
+                  <Input
+                    id="backupCode"
+                    name="backupCode"
+                    type="text"
+                    value={backupCode}
+                    onChange={(e) => setBackupCode(e.target.value)}
+                    placeholder="XXXX-XXXX-XXXX"
+                    required
+                    className="mt-1"
+                  />
+                </div>
+              )}
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setUseBackupCode(!useBackupCode)}
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+                >
+                  {useBackupCode
+                    ? "Use authenticator app instead"
+                    : "Use a backup code instead"}
+                </button>
               </div>
-            ) : (
-              <div className="mb-4 flex items-center gap-3 w-full px-5 py-2.5 bg-[#333A5C] rounded-full">
-                <img src={assets.key_icon} alt="" />
-                <input
-                  onChange={(e) => setBackupCode(e.target.value)}
-                  value={backupCode}
-                  type="text"
-                  placeholder="Backup code (XXXX-XXXX-XXXX)"
-                  className="bg-transparent outline-none w-full"
-                  required
-                  pattern="[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"
-                />
-              </div>
-            )}
 
-            <div className="flex items-center justify-between mb-5">
-              <button
-                type="button"
-                onClick={toggleBackupCode}
-                className="text-xs text-indigo-400 hover:underline"
-              >
-                {useBackupCode
-                  ? "Use authentication app instead"
-                  : "Use a backup code instead"}
-              </button>
-            </div>
-
-            <button
-              disabled={loading}
-              className={`text-white bg-indigo-600 hover:bg-indigo-700 w-full py-2.5 rounded-full transition-colors ${
-                loading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
-              type="submit"
-            >
-              {loading ? "Verifying..." : "Verify & Continue"}
-            </button>
-          </form>
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? (
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  "Verify"
+                )}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-6 sm:px-0 bg-gradient-to-br from-blue-200 to-purple-400">
-      <img
-        onClick={() => navigate("/")}
-        src={assets.logo}
-        alt=""
-        className="absolute left-5 top-5 sm:left-20 w-28 sm:w-32 cursor-pointer"
-      />
-      <div className="bg-slate-900 p-10 rounded-lg shadow-lg w-full sm:w-96 text-indigo-300 text-sm">
-        <h2 className="text-3xl font-semibold text-white text-center mb-3">
-          {formType === "Sign Up" ? "Sign up" : "Sign In"}
-        </h2>
-        <p className="text-center text-sm mb-6">
-          {formType === "Sign Up"
-            ? "Create an account"
-            : "Login to your account"}
-        </p>
-
-        <form onSubmit={handleLoginSubmit}>
-          <div className="mb-4 flex items-center gap-3 w-full px-5 py-2.5 bg-[#333A5C] rounded-full">
-            <img src={assets.mail_icon} alt="" />
-            <input
-              onChange={(e) => setEmail(e.target.value)}
-              value={email}
-              type="email"
-              placeholder="Email address"
-              className="bg-transparent outline-none w-full"
-              required
-            />
-          </div>
-          <div className="mb-4 flex items-center gap-3 w-full px-5 py-2.5 bg-[#333A5C] rounded-full">
-            <img src={assets.lock_icon} alt="" />
-            <input
-              onChange={(e) => setPassword(e.target.value)}
-              value={password}
-              type="password"
-              placeholder="Password"
-              className="bg-transparent outline-none w-full"
-              required
-            />
-          </div>
-
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
-              />
-              <label
-                htmlFor="rememberMe"
-                className="ml-2 text-xs text-gray-400"
-              >
-                Remember me
-              </label>
-            </div>
-            <Link
-              to="/forgot-password"
-              className="text-xs text-indigo-400 hover:underline"
-            >
-              Forgot Password?
-            </Link>
-          </div>
-
-          <button
-            disabled={loading}
-            className={`text-white bg-indigo-600 hover:bg-indigo-700 w-full py-2.5 rounded-full transition-colors ${
-              loading ? "opacity-70 cursor-not-allowed" : ""
-            }`}
-            type="submit"
-          >
-            {loading ? "Please wait..." : "Sign In"}
-          </button>
-
-          <div className="mt-5 text-center text-xs">
-            <p>
-              Don't have an account?{" "}
-              <Link to="/register" className="text-indigo-400 hover:underline">
-                Sign Up
-              </Link>
+    <div className="flex min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="flex flex-col justify-center flex-1 px-4 py-12 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Sign in to your account to continue
             </p>
           </div>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-700"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-slate-900 text-gray-400">
-                  Or continue with
-                </span>
-              </div>
-            </div>
+          <Card className="shadow-xl">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-2xl text-center">Sign in</CardTitle>
+              <CardDescription className="text-center">
+                Enter your credentials to access your account
+              </CardDescription>
+            </CardHeader>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => handleOAuthLogin("google")}
-                className="flex justify-center items-center py-2.5 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <img
-                  src={assets.google_icon}
-                  alt="Google"
-                  className="w-5 h-5 mr-2"
-                />
-                Google
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOAuthLogin("github")}
-                className="flex justify-center items-center py-2.5 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <img
-                  src={assets.github_icon}
-                  alt="GitHub"
-                  className="w-5 h-5 mr-2"
-                />
-                GitHub
-              </button>
-            </div>
-          </div>
-        </form>
+            <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email address</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <Label
+                      htmlFor="remember-me"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Remember me
+                    </Label>
+                  </div>
+
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign in"
+                  )}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Or continue with
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOAuthLogin("google")}
+                    className="transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <img
+                      src={assets.google_icon}
+                      alt="Google"
+                      className="w-4 h-4 mr-2"
+                    />
+                    Google
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOAuthLogin("github")}
+                    className="transition-all duration-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <img
+                      src={assets.github_icon}
+                      alt="GitHub"
+                      className="w-4 h-4 mr-2"
+                    />
+                    GitHub
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+
+            <CardFooter>
+              <div className="text-sm text-center w-full">
+                <span className="text-muted-foreground">
+                  Don't have an account?
+                </span>{" "}
+                <Link
+                  to="/register"
+                  className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                >
+                  Sign up
+                </Link>
+              </div>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   );
 };
+
+export default LoginPage;

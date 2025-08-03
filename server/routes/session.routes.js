@@ -1,23 +1,20 @@
 import express from "express";
-import authMiddleware from "../middleware/auth.middleware.js";
 import {
-  getUserSessions,
-  terminateSession,
-  terminateAllSessions,
+  getActiveSessions,
+  revokeSession,
+  revokeAllSessions,
 } from "../controllers/session.controller.js";
+import userAuth from "../middleware/auth.middleware.js";
 
 const sessionRouter = express.Router();
 
-// All routes require authentication
-sessionRouter.use(authMiddleware);
-
 // Get all active sessions for current user
-sessionRouter.get("/", getUserSessions);
+sessionRouter.get("/", userAuth, getActiveSessions);
 
 // Terminate specific session
-sessionRouter.delete("/:sessionId", terminateSession);
+sessionRouter.delete("/:sessionId", userAuth, revokeSession);
 
 // Terminate all sessions except current one
-sessionRouter.delete("/", terminateAllSessions);
+sessionRouter.delete("/", userAuth, revokeAllSessions);
 
 export default sessionRouter;

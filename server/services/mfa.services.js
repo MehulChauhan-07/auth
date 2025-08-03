@@ -49,15 +49,26 @@ export const generateMfaSecret = async (userId) => {
 export const verifyMfaToken = async (userId, token) => {
   try {
     const user = await userModel.findById(userId);
-    if (!user || !user.mfaSecret) return false;
+    if (!user || !user.mfaSecret) {
+      logger.error("User or MFA secret not found", { userId });
+      return false;
+    }
 
-    // Verify token
-    return speakeasy.totp.verify({
+    // Verify token with more lenient window for clock drift
+    const isValid = speakeasy.totp.verify({
       secret: user.mfaSecret,
       encoding: "base32",
       token: token,
-      window: 1, // Allow 1 step before/after for clock drift
+      window: 2, // Allow 2 steps before/after for clock drift (60 seconds total)
     });
+
+    logger.info("MFA token verification result", {
+      userId,
+      isValid,
+      token: token.substring(0, 3) + "***", // Log partial token for debugging
+    });
+
+    return isValid;
   } catch (error) {
     logger.error("Error verifying MFA token", { error: error.message, userId });
     throw error;
@@ -67,29 +78,26 @@ export const verifyMfaToken = async (userId, token) => {
 /**
  * Enable MFA for a user account
  * @param {string} userId - User ID
- * @param {string} token - MFA token to verify before enabling
  * @returns {Promise<Object>} Success status and backup codes
  */
-export const enableMfa = async (userId, token) => {
+export const enableMfa = async (userId) => {
   try {
-    // First verify token is valid
-    const isValid = await verifyMfaToken(userId, token);
-    if (!isValid) {
-      return {
-        success: false,
-        message: "Invalid verification code",
-      };
-    }
-
     // Generate backup codes
     const backupCodes = [];
     for (let i = 0; i < 10; i++) {
-      const code = crypto.randomBytes(4).toString("hex");
+      const code = crypto.randomBytes(4).toString("hex").toUpperCase();
       backupCodes.push({ code, used: false });
     }
 
     // Enable MFA and save backup codes
     const user = await userModel.findById(userId);
+    if (!user) {
+      return {
+        success: false,
+        message: "User not found",
+      };
+    }
+
     user.mfaEnabled = true;
     user.backupCodes = backupCodes;
     await user.save();

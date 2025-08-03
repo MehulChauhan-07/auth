@@ -8,6 +8,10 @@ import {
   generateOTP,
   generateToken,
   generateTokenPair,
+  storeRefreshToken,
+  invalidateRefreshToken,
+  verifyRefreshToken,
+  isRefreshTokenValid,
 } from "../services/auth.services.js";
 import {
   sendWelcomeEmail,
@@ -43,14 +47,34 @@ export const register = async (req, res) => {
 
     const user = await createUser({ name, email, password });
 
-    const token = generateToken(user._id);
+    const { accessToken, refreshToken } = generateTokenPair(user._id);
 
-    res.cookie("token", token, {
+    // const token = generateToken(user._id);
+
+    await storeRefreshToken(user._id, refreshToken);
+
+    res.cookie("token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "None" : "strict",
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 30 * 60 * 1000, // 30 minutes
     });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    //  ! track the devide information
+    const deviceInfo = {
+      deviceInfo: req.headers["user-agent"] || "Unknown Device",
+      ipAddress: req.ip,
+      lastActive: new Date(),
+      userAgent: req.headers["user-agent"],
+      tokenIdentifier: refreshToken.substring(refreshToken.length - 20), // Use last 20 chars of refresh token as identifier
+    };
+
+    await user.addSession(deviceInfo);
 
     // ! sending mail
     await sendWelcomeEmail(user);
@@ -85,7 +109,6 @@ export const login = async (req, res) => {
   const { email, password, rememberMe = false } = req.body;
 
   // Validation is now handled by the validator middleware
-  // Just in case it's not used yet
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -148,10 +171,12 @@ export const login = async (req, res) => {
     // generate token with extended expiration if rememberMe is true
     const { accessToken, refreshToken } = generateTokenPair(user._id);
 
+    await storeRefreshToken(user._id, refreshToken);
+
     // Set cookie expiration time based on rememberMe
     const cookieExpiration = rememberMe
-      ? 7 * 24 * 60 * 60 * 1000 // 7 days
-      : 24 * 60 * 60 * 1000; // 1 day
+      ? 30 * 24 * 60 * 60 * 1000 // 30 days
+      : 7 * 24 * 60 * 60 * 1000; // 7 days
 
     res.cookie("token", accessToken, {
       httpOnly: true,
@@ -167,11 +192,29 @@ export const login = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    const deviceInfo = {
+      deviceInfo: req.headers["user-agent"] || "Unknown Device",
+      ipAddress: req.ip,
+      lastActive: new Date(),
+      userAgent: req.headers["user-agent"],
+      tokenIdentifier: refreshToken.substring(refreshToken.length - 20), // Use last 20 chars of refresh token as identifier
+    };
+    await user.addSession(deviceInfo);
+
+    // ! get user info without sensitive data
+    const userInfo = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      isAccountVerified: user.isAccountVerified,
+      mfaEnabled: user.mfaEnabled,
+    };
+
     return res.json({
       success: true,
       message: "Login successful",
       token: accessToken,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: userInfo,
       rememberMe: rememberMe,
     });
   } catch (error) {
@@ -186,15 +229,57 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
+    const refreshToken = req.cookies.refreshToken;
+
+    console.log("🔍 Logout attempt - refreshToken exists:", !!refreshToken);
+
+    if (refreshToken) {
+      try {
+        const decoded = jwt.verify(
+          refreshToken,
+          process.env.REFRESH_TOKEN_SECRET
+        );
+        console.log("🔍 Logout - decoded userId:", decoded.id);
+
+        if (decoded.id) {
+          // Invalidate the refresh token in database
+          await invalidateRefreshToken(decoded.id);
+
+          // Remove session from active sessions
+          const user = await userModel.findById(decoded.id);
+          if (user) {
+            const tokenIdentifier = refreshToken.substring(
+              refreshToken.length - 20
+            );
+            await user.removeSession(tokenIdentifier);
+            console.log("✅ Session removed for user:", user.email);
+          }
+        }
+      } catch (error) {
+        console.error(
+          "❌ Error processing refresh token during logout:",
+          error.message
+        );
+      }
+    }
+
+    // Clear cookies regardless of refresh token processing
     res.clearCookie("token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "None" : "strict",
     });
 
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "None" : "strict",
+    });
+
+    console.log("✅ Logout successful - cookies cleared");
     return res.json({ success: true, message: "Logout successful" });
   } catch (error) {
-    console.error("Error in logout:", error);
+    console.error("❌ Error in logout:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -289,7 +374,13 @@ export const verifyOtp = async (req, res) => {
 
 export const isAuthenticated = async (req, res) => {
   try {
-    return res.json({ success: true });
+    // If we reach here, userAuth middleware has already verified the token
+    // and attached user info to req.user
+    return res.json({
+      success: true,
+      message: "User is authenticated",
+      userId: req.user.userId,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -336,13 +427,11 @@ export const sendResetPasswordOtp = async (req, res) => {
     } catch (emailError) {
       console.error("Failed to send OTP email:", emailError);
 
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Failed to send OTP email",
-          error: emailError.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email",
+        error: emailError.message,
+      });
     }
 
     return res.json({ success: true, message: "OTP sent to your email" });

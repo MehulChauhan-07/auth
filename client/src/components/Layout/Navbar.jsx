@@ -1,81 +1,112 @@
-import React, { useContext } from "react";
-import { assets } from "../../assets/assets.js";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AppContext } from "../../context/AppContext.jsx";
-import axios from "axios";
-import { toast } from "react-toastify";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { User, LogOut, Settings, Shield } from "lucide-react";
 
 const Navbar = () => {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { userData, backendUrl, setUserData, setIsLoggedIn } =
-    useContext(AppContext);
 
   const handleLogout = async () => {
     try {
-      axios.defaults.withCredentials = true;
-      const { data } = await axios.post(`${backendUrl}/auth/logout`);
-      data.success && setIsLoggedIn(false);
-      data.success && setUserData(false);
-      navigate("/");
+      const result = await logout();
+      if (result.success) {
+        navigate("/login");
+      }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Logout failed");
+      console.error("Logout error:", error);
+      navigate("/login");
     }
   };
 
-  const sendVerificationOtp = async () => {
-    try {
-      axios.defaults.withCredentials = true;
-      const { data } = await axios.post(
-        `${backendUrl}/auth/send-verification-otp`
-      );
-      if (data.success) {
-        navigate("/verify-email");
-        toast.success(data.message);
-      }
-    } catch (error) {
-      console.error("Error sending verification OTP:", error);
-      toast.error(error.message);
-    }
-  };
   return (
-    <div className="w-full flex justify-between items-center p-4 sm:p-6 sm:px-24 bg-white shadow-md absolute top-0">
-      <Link to="/">
-        <img className="w-32 sm:w-44" src={assets.logo} alt="Logo" />
-      </Link>
-      {userData ? (
-        <div className="w-8 h-8 flex justify-center items-center rounded-full bg-black relative group text-white">
-          {userData.name[0].toUpperCase()}
-          <div className="absolute hidden group-hover:block top-0 right-0 z-10 text-black rounded pt-10">
-            <ul className="list-none m-0 p-2 bg-gray-100 text-sm">
-              {!userData.isAccountVerified && (
-                <li onClick={sendVerificationOtp} className="py-1 px-2 hover:bg-gray-200">
-                  <Link
-                    to="/verify-email"
-                    className="block px-4 py-2 hover:bg-gray-100"
-                  >
-                    Verify Email
-                  </Link>
-                </li>
-              )}
-              <li
-                className="py-1 px-2 hover:bg-gray-200 cursor-pointer"
-                onClick={handleLogout}
+    <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container max-w-screen-2xl mx-auto flex h-14 items-center">
+        <div className="mr-4 hidden md:flex">
+          <Link className="mr-6 flex items-center space-x-2" to="/">
+            <Shield className="h-6 w-6" />
+            <span className="hidden font-bold sm:inline-block">MERN Auth</span>
+          </Link>
+          <nav className="flex items-center space-x-6 text-sm font-medium">
+            <Link
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+              to="/"
+            >
+              Home
+            </Link>
+            {user && (
+              <Link
+                className="transition-colors hover:text-foreground/80 text-foreground/60"
+                to="/dashboard"
               >
-                Logout
-              </li>
-            </ul>
-          </div>
+                Dashboard
+              </Link>
+            )}
+          </nav>
         </div>
-      ) : (
-        <button
-          className="flex items-center gap-2 border border-gray-500 rounded-full text-gray-800 px-6 py-2 hover:bg-gray-100 transition-all"
-          onClick={() => navigate("/login")}
-        >
-          Get started{" "}
-          <img className="w-3 sm:w-4" src={assets.arrow_icon} alt="" />
-        </button>
-      )}
-    </div>
+
+        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+          <div className="w-full flex-1 md:w-auto md:flex-none">
+            {/* Search or other content can go here */}
+          </div>
+          <nav className="flex items-center space-x-2">
+            <ThemeToggle />
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="relative h-8 w-8 rounded-full"
+                  >
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <p className="font-medium">{user.name}</p>
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                    <User className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" onClick={() => navigate("/login")}>
+                  Sign In
+                </Button>
+                <Button onClick={() => navigate("/register")}>Sign Up</Button>
+              </div>
+            )}
+          </nav>
+        </div>
+      </div>
+    </nav>
   );
 };
 

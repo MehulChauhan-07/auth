@@ -1,245 +1,153 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
-import { toast } from "react-toastify";
+// src/context/AuthContext.jsx
+import React, { createContext, useState, useEffect } from "react";
+import api, { authAPI } from "../lib/api.js";
 
-const AuthContext = createContext();
+export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState(null);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tokenRefreshing, setTokenRefreshing] = useState(false);
-  const [csrfToken, setCsrfToken] = useState(null);
+  const [error, setError] = useState(null);
 
-  const backendUrl =
-    import.meta.env.VITE_BACKEND_URL || "http://localhost:3000/api";
-
-  // Configure axios defaults
-  axios.defaults.withCredentials = true;
-
-  // Function to get CSRF token
-  const getCsrfToken = async () => {
-    try {
-      const response = await axios.get(
-        `${backendUrl.replace("/auth", "")}/csrf-token`
-      );
-      const token = response.data.csrfToken;
-      setCsrfToken(token);
-      return token;
-    } catch (error) {
-      console.error("Error getting CSRF token:", error);
-      return null;
-    }
-  };
-
-  // Function to make authenticated POST requests with CSRF token
-  const authenticatedPost = async (url, data) => {
-    let token = csrfToken;
-
-    // If no token, get a new one
-    if (!token) {
-      token = await getCsrfToken();
-    }
-
-    if (!token) {
-      throw new Error("Failed to get CSRF token");
-    }
-
-    return axios.post(url, data, {
-      headers: {
-        "X-CSRF-Token": token,
-      },
-    });
-  };
-
-  // Axios interceptor for token refresh
-  axios.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalRequest = error.config;
-
-      // If error is 401 and token expired and not already retrying
-      if (
-        error.response &&
-        error.response.status === 401 &&
-        error.response.data.tokenExpired &&
-        !originalRequest._retry
-      ) {
-        originalRequest._retry = true;
-
-        try {
-          setTokenRefreshing(true);
-          // Call refresh token endpoint
-          await axios.post(`${backendUrl}/auth/refresh-token`);
-          setTokenRefreshing(false);
-
-          // Retry the original request
-          return axios(originalRequest);
-        } catch (refreshError) {
-          setTokenRefreshing(false);
-          // If refresh fails, log out
-          logout();
-          return Promise.reject(refreshError);
-        }
-      }
-
-      return Promise.reject(error);
-    }
-  );
-
-  // Check if user is authenticated on mount
+  // Check auth status on mount
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthStatus = async () => {
       try {
-        // Pre-fetch CSRF token
-        await getCsrfToken();
-
-        const response = await axios.get(`${backendUrl}/auth/is-authenticated`);
+        // Use the user data endpoint which gives us full user info
+        const response = await api.get("/user/data");
 
         if (response.data.success) {
-          setIsLoggedIn(true);
-          setUserData(response.data.user);
-        } else {
-          setIsLoggedIn(false);
-          setUserData(null);
+          setUser(response.data.user);
         }
-      } catch (error) {
-        setIsLoggedIn(false);
-        setUserData(null);
+      } catch (err) {
+        // If the request fails, user is not authenticated or token is invalid
+        console.log("Auth check failed:", err.response?.status);
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    checkAuth();
-  }, [backendUrl]);
+    checkAuthStatus();
+  }, []);
 
-  // Login function
-  const login = async (email, password, rememberMe = false) => {
+  // Register function
+  const register = async (userData) => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await authenticatedPost(`${backendUrl}/auth/login`, {
-        email,
-        password,
-        rememberMe,
-      });
+      const response = await authAPI.register(userData);
 
       if (response.data.success) {
-        // Check if user has MFA enabled
-        if (response.data.user?.mfaEnabled) {
-          // Return MFA required status for UI to show MFA input
-          return {
-            success: true,
-            mfaRequired: true,
-            userId: response.data.user.id,
-            email: email,
-            password: password, // Store temporarily for MFA verification
-          };
-        }
-
-        setIsLoggedIn(true);
-        await getUserData();
+        await fetchUser();
         return { success: true };
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError(err.response?.data?.message || "Registration failed");
       return {
         success: false,
-        message: error.response?.data?.message || "Login failed",
+        message: err.response?.data?.message || "Registration failed",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Register function
-  const register = async (name, email, password) => {
+  // Login function
+  const login = async (credentials) => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await authenticatedPost(`${backendUrl}/auth/register`, {
-        name,
-        email,
-        password,
-      });
+      const response = await authAPI.login(credentials);
 
       if (response.data.success) {
-        setIsLoggedIn(true);
-        await getUserData();
+        if (response.data.mfaRequired) {
+          return {
+            success: true,
+            mfaRequired: true,
+            userId: response.data.userId,
+          };
+        }
+
+        await fetchUser();
         return { success: true };
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Register error:", error);
+    } catch (err) {
+      console.error("Login error:", err);
+      setError(err.response?.data?.message || "Login failed");
       return {
         success: false,
-        message: error.response?.data?.message || "Registration failed",
+        message: err.response?.data?.message || "Login failed",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
   // Logout function
   const logout = async () => {
+    setLoading(true);
     try {
-      await authenticatedPost(`${backendUrl}/auth/logout`, {});
-    } catch (error) {
-      console.error("Logout error:", error);
+      console.log("🔍 Starting logout process...");
+      const response = await authAPI.logout();
+
+      if (response.data.success) {
+        console.log("✅ Logout successful on server");
+      } else {
+        console.warn("⚠️ Server logout returned error:", response.data.message);
+      }
+
+      // Clear user state regardless of server response
+      setUser(null);
+      setError(null);
+
+      console.log("✅ User state cleared");
+      return { success: true };
+    } catch (err) {
+      console.error("❌ Logout error:", err);
+      // Even if server logout fails, clear local state
+      setUser(null);
+      setError(null);
+
+      return {
+        success: true, // Return success to allow frontend logout
+        message:
+          "Logged out locally (server error: " +
+          (err.response?.data?.message || err.message) +
+          ")",
+      };
     } finally {
-      // Clear state even if API call fails
-      setIsLoggedIn(false);
-      setUserData(null);
-      setCsrfToken(null); // Clear CSRF token on logout
+      setLoading(false);
     }
   };
 
-  // Get user data
-  const getUserData = async () => {
+  // Fetch user data
+  const fetchUser = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/user/data`);
+      const response = await api.get("/user/data");
 
       if (response.data.success) {
-        setUserData(response.data.user);
+        setUser(response.data.user);
         return response.data.user;
       }
 
       return null;
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      return null;
+    } catch (err) {
+      setUser(null);
+      throw err;
     }
   };
 
-  // Verify MFA token
-  const verifyMfa = async (email, password, token, backupCode = null) => {
-    try {
-      const response = await authenticatedPost(
-        `${backendUrl}/mfa/verify-login`,
-        {
-          email: email,
-          password: password,
-          token: token || undefined,
-          backupCode: backupCode || undefined,
-        }
-      );
-
-      if (response.data.success) {
-        setIsLoggedIn(true);
-        await getUserData();
-        return { success: true };
-      }
-
-      return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("MFA verification error:", error);
-      return {
-        success: false,
-        message: error.response?.data?.message || "MFA verification failed",
-      };
-    }
-  };
-
-  // Setup MFA
+  // MFA setup functions
   const setupMfa = async () => {
+    setLoading(true);
     try {
-      const response = await authenticatedPost(`${backendUrl}/mfa/setup`, {});
+      const response = await api.post("/mfa/setup");
 
       if (response.data.success) {
         return {
@@ -250,26 +158,24 @@ export const AuthProvider = ({ children }) => {
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("MFA setup error:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to setup MFA");
       return {
         success: false,
-        message: error.response?.data?.message || "MFA setup failed",
+        message: err.response?.data?.message || "Failed to setup MFA",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Enable MFA
-  const enableMfa = async (token) => {
+  const verifyMfa = async (token) => {
+    setLoading(true);
     try {
-      const response = await authenticatedPost(`${backendUrl}/mfa/enable`, {
-        token,
-      });
+      const response = await api.post("/mfa/verify", { token });
 
       if (response.data.success) {
-        // Update user data to reflect MFA status
-        await getUserData();
-
+        await fetchUser();
         return {
           success: true,
           backupCodes: response.data.data.backupCodes,
@@ -277,121 +183,121 @@ export const AuthProvider = ({ children }) => {
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("MFA activation error:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to verify MFA");
       return {
         success: false,
-        message: error.response?.data?.message || "MFA activation failed",
+        message: err.response?.data?.message || "Failed to verify MFA",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Disable MFA
-  const disableMfa = async (password) => {
+  const verifyMfaLogin = async (userId, token, backupCode) => {
+    setLoading(true);
     try {
-      const response = await authenticatedPost(`${backendUrl}/mfa/disable`, {
-        password,
+      const response = await api.post("/mfa/verify-login", {
+        userId,
+        token: token || undefined,
+        backupCode: backupCode || undefined,
       });
 
       if (response.data.success) {
-        // Update user data to reflect MFA status
-        await getUserData();
+        await fetchUser();
         return { success: true };
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("MFA deactivation error:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to verify MFA");
       return {
         success: false,
-        message: error.response?.data?.message || "MFA deactivation failed",
+        message: err.response?.data?.message || "Failed to verify MFA",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Get active sessions
-  const getActiveSessions = async () => {
+  const disableMfa = async (password) => {
+    setLoading(true);
     try {
-      const response = await axios.get(`${backendUrl}/sessions`);
+      const response = await api.post("/mfa/disable", { password });
 
       if (response.data.success) {
-        return {
-          success: true,
-          sessions: response.data.data.sessions,
-        };
+        await fetchUser();
+        return { success: true };
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Error fetching sessions:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to disable MFA");
       return {
         success: false,
-        message: error.response?.data?.message || "Failed to fetch sessions",
+        message: err.response?.data?.message || "Failed to disable MFA",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Revoke a session
+  // Session management
+  const getSessions = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get("/sessions");
+      return response.data;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to fetch sessions");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const revokeSession = async (sessionId) => {
     try {
-      const response = await axios.delete(
-        `${backendUrl}/sessions/${sessionId}`
-      );
-
-      if (response.data.success) {
-        return { success: true };
-      }
-
-      return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Error revoking session:", error);
-      return {
-        success: false,
-        message: error.response?.data?.message || "Failed to revoke session",
-      };
+      const response = await api.delete(`/sessions/${sessionId}`);
+      return response.data;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to revoke session");
+      throw err;
     }
   };
 
-  // Revoke all other sessions
   const revokeAllSessions = async () => {
     try {
-      const response = await axios.delete(`${backendUrl}/sessions`);
-
-      if (response.data.success) {
-        return { success: true };
-      }
-
-      return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Error revoking sessions:", error);
-      return {
-        success: false,
-        message: error.response?.data?.message || "Failed to revoke sessions",
-      };
+      const response = await api.delete("/sessions");
+      return response.data;
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to revoke all sessions");
+      throw err;
     }
   };
 
-  // Handle OAuth login
+  // OAuth methods
   const oauthLogin = (provider) => {
-    window.location.href = `${backendUrl}/auth/${provider}`;
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    window.location.href = `${API_URL}/auth/${provider}`;
   };
 
-  // Update user profile
-  const updateProfile = async (data) => {
+  // Profile update
+  const updateProfile = async (profileData) => {
     try {
-      const response = await axios.put(`${backendUrl}/user/update`, data);
+      const response = await api.put("/user/update", profileData);
 
       if (response.data.success) {
-        setUserData(response.data.user);
+        setUser(response.data.user);
         return { success: true };
       }
 
       return { success: false, message: response.data.message };
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update profile");
       return {
         success: false,
-        message: error.response?.data?.message || "Failed to update profile",
+        message: err.response?.data?.message || "Failed to update profile",
       };
     }
   };
@@ -399,30 +305,25 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider
       value={{
-        isLoggedIn,
-        userData,
+        user,
         loading,
-        tokenRefreshing,
-        backendUrl,
-        login,
+        error,
         register,
+        login,
         logout,
-        getUserData,
-        verifyMfa,
+        fetchUser,
         setupMfa,
-        enableMfa,
+        verifyMfa,
+        verifyMfaLogin,
         disableMfa,
-        getActiveSessions,
+        getSessions,
         revokeSession,
         revokeAllSessions,
         oauthLogin,
         updateProfile,
-        getCsrfToken, // Export for manual use if needed
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);
