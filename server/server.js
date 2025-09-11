@@ -91,7 +91,14 @@ app.use(
 const tokens = new csrf();
 
 // Conditionally apply CSRF protection
+console.log('🔒 CSRF Configuration:', {
+  DISABLE_CSRF: process.env.DISABLE_CSRF,
+  type: typeof process.env.DISABLE_CSRF,
+  isDisabled: process.env.DISABLE_CSRF === "true"
+});
+
 if (process.env.DISABLE_CSRF !== "true") {
+  console.log('⚠️  CSRF Protection: ENABLED');
   app.use((req, res, next) => {
     // Generate CSRF token
     if (!req.session.csrfSecret) {
@@ -107,9 +114,17 @@ if (process.env.DISABLE_CSRF !== "true") {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       // Skip CSRF for test routes
       if (!req.url.includes("/test/")) {
-        const token = req.headers["x-csrf-token"] || req.body._csrf;
+        const token = req.headers["x-csrf-token"] ;
+        console.log('🔍 CSRF Debug:', {
+          method: req.method,
+          url: req.url,
+          hasToken: !!token,
+          token: token ? token.substring(0, 10) + '...' : 'none',
+          hasSecret: !!req.session.csrfSecret
+        });
 
         if (!token || !tokens.verify(req.session.csrfSecret, token)) {
+          console.log('❌ CSRF Validation Failed');
           return res.status(403).json({
             success: false,
             message: {
@@ -124,6 +139,7 @@ if (process.env.DISABLE_CSRF !== "true") {
     next();
   });
 } else {
+  console.log('✅ CSRF Protection: DISABLED');
   // Bypass CSRF when disabled
   app.use((req, res, next) => {
     req.csrfToken = function () {
