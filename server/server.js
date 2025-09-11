@@ -6,9 +6,6 @@ import connectDB from "./config/db.config.js";
 import logger from "./utils/logger.js";
 import helmet from "helmet";
 // import { apiLimiter } from "./middleware/rateLimiter.middleware.js";
-import csrfProtection, {
-  handleCsrfError,
-} from "./middleware/csrf.middleware.js";
 import passport from "./config/passport.config.js";
 import csrf from "csrf";
 import session from "express-session";
@@ -114,25 +111,54 @@ if (process.env.DISABLE_CSRF !== "true") {
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
       // Skip CSRF for test routes
       if (!req.url.includes("/test/")) {
-        const token = req.headers["x-csrf-token"] ;
+        const token = req.headers["x-csrf-token"];
         console.log('🔍 CSRF Debug:', {
           method: req.method,
           url: req.url,
           hasToken: !!token,
           token: token ? token.substring(0, 10) + '...' : 'none',
-          hasSecret: !!req.session.csrfSecret
+          hasSecret: !!req.session.csrfSecret,
+          sessionId: req.sessionID ? req.sessionID.substring(0, 8) + '...' : 'none',
+          cookieHeader: req.headers.cookie ? 'present' : 'missing'
         });
 
-        if (!token || !tokens.verify(req.session.csrfSecret, token)) {
-          console.log('❌ CSRF Validation Failed');
+        if (!token) {
+          console.log('❌ CSRF Validation Failed: No token provided');
           return res.status(403).json({
             success: false,
             message: {
               code: "SEC_002",
-              message: "Invalid or missing CSRF token",
+              message: "Missing CSRF token",
             },
           });
         }
+
+        if (!req.session.csrfSecret) {
+          console.log('❌ CSRF Validation Failed: No session secret');
+          return res.status(403).json({
+            success: false,
+            message: {
+              code: "SEC_002", 
+              message: "Session expired or invalid",
+            },
+          });
+        }
+ 
+        const isValidToken = tokens.verify(req.session.csrfSecret, token);
+        console.log('🔍 Token validation result:', isValidToken);
+        
+        if (!isValidToken) {
+          console.log('❌ CSRF Validation Failed: Invalid token');
+          return res.status(403).json({
+            success: false,
+            message: {
+              code: "SEC_002",
+              message: "Invalid CSRF token",
+            },
+          });
+        }
+        
+        console.log('✅ CSRF validation passed');
       }
     }
 

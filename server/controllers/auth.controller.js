@@ -82,7 +82,7 @@ export const register = async (req, res) => {
     return res.json({
       success: true,
       message: "Registration successful",
-      user: { token: token, id: user._id, name: user.name, email: user.email },
+      user: { id: user._id, name: user.name, email: user.email },
     });
   } catch (error) {
     console.error("Error in register:", error);

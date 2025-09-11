@@ -1,0 +1,270 @@
+{
+	"info": {
+		"name": "MERN Auth CSRF Flow",
+		"description": "Proper CSRF token testing for MERN Auth API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "csrfToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Get CSRF Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Save CSRF token to environment",
+							"if (pm.response.code === 200) {",
+							"    const response = pm.response.json();",
+							"    pm.environment.set('csrfToken', response.csrfToken);",
+							"    ",
+							"    // Debug session info",
+							"    const cookies = pm.cookies.all();",
+							"    console.log('Session cookies:', cookies.map(c => c.name));",
+							"    console.log('CSRF Token saved:', response.csrfToken.substring(0, 10) + '...');",
+							"    ",
+							"    // Verify token was saved",
+							"    pm.test('CSRF token received', function () {",
+							"        pm.expect(response.csrfToken).to.be.a('string');",
+							"        pm.expect(response.csrfToken.length).to.be.greaterThan(10);",
+							"    });",
+							"} else {",
+							"    console.log('Failed to get CSRF token:', pm.response.json());",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/csrf-token",
+					"host": ["{{baseUrl}}"],
+					"path": ["csrf-token"]
+				},
+				"description": "Get CSRF token and establish session"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Register with CSRF",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// Debug request info",
+							"console.log('CSRF Token used:', pm.environment.get('csrfToken')?.substring(0, 10) + '...');",
+							"console.log('Response status:', pm.response.code);",
+							"",
+							"if (pm.response.code === 200) {",
+							"    const response = pm.response.json();",
+							"    console.log('Registration successful:', response.user?.name);",
+							"    ",
+							"    // Save user email for login test",
+							"    pm.environment.set('testUserEmail', pm.request.body.raw ? JSON.parse(pm.request.body.raw).email : '');",
+							"    ",
+							"    pm.test('Registration successful', function () {",
+							"        pm.expect(response.success).to.be.true;",
+							"        pm.expect(response.user).to.be.an('object');",
+							"    });",
+							"} else {",
+							"    const errorResponse = pm.response.json();",
+							"    console.log('Registration failed:', errorResponse);",
+							"    ",
+							"    if (errorResponse.message?.code === 'SEC_002') {",
+							"        console.log('CSRF Error - Check:');",
+							"        console.log('1. Did you run \"Get CSRF Token\" first?');",
+							"        console.log('2. Are cookies enabled in Postman?');",
+							"        console.log('3. Are you using the same Postman tab?');",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Verify CSRF token exists",
+							"const csrfToken = pm.environment.get('csrfToken');",
+							"if (!csrfToken) {",
+							"    throw new Error('CSRF token not found. Run \"Get CSRF Token\" request first.');",
+							"}",
+							"console.log('Using CSRF token:', csrfToken.substring(0, 10) + '...');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-CSRF-Token",
+						"value": "{{csrfToken}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"CSRF Test User\",\n  \"email\": \"csrf_test_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/register",
+					"host": ["{{baseUrl}}"],
+					"path": ["auth", "register"]
+				},
+				"description": "Register new user using CSRF token from step 1"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Login with CSRF",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    const response = pm.response.json();",
+							"    console.log('Login successful:', response.user?.name);",
+							"    ",
+							"    pm.test('Login successful', function () {",
+							"        pm.expect(response.success).to.be.true;",
+							"        pm.expect(response.token || response.user).to.exist;",
+							"    });",
+							"} else {",
+							"    const errorResponse = pm.response.json();",
+							"    console.log('Login failed:', errorResponse);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Update email from registration",
+							"const testEmail = pm.environment.get('testUserEmail');",
+							"if (testEmail) {",
+							"    const body = JSON.parse(pm.request.body.raw);",
+							"    body.email = testEmail;",
+							"    pm.request.body.raw = JSON.stringify(body);",
+							"    console.log('Using registered email:', testEmail);",
+							"} else {",
+							"    console.log('Warning: No test email found, using default');",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-CSRF-Token",
+						"value": "{{csrfToken}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"csrf_test@example.com\",\n  \"password\": \"TestPass123!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["auth", "login"]
+				},
+				"description": "Login with the same CSRF token and session"
+			},
+			"response": []
+		},
+		{
+			"name": "4. Test Without Token (Should Fail)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// This should fail with CSRF error",
+							"if (pm.response.code === 403) {",
+							"    const response = pm.response.json();",
+							"    console.log('✅ Correctly failed with CSRF error:', response.message);",
+							"    ",
+							"    pm.test('CSRF protection working', function () {",
+							"        pm.expect(response.success).to.be.false;",
+							"        pm.expect(response.message.code).to.equal('SEC_002');",
+							"    });",
+							"} else {",
+							"    console.log('❌ Should have failed but got:', pm.response.code);",
+							"    pm.test('CSRF protection should block this', function () {",
+							"        pm.expect(pm.response.code).to.equal(403);",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Should Fail User\",\n  \"email\": \"shouldfail_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/auth/register",
+					"host": ["{{baseUrl}}"],
+					"path": ["auth", "register"]
+				},
+				"description": "Test registration without CSRF token - should fail"
+			},
+			"response": []
+		}
+	]
+}

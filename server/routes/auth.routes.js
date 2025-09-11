@@ -19,16 +19,17 @@ import {
   validateLogin,
   validateRegister,
 } from "../validators/auth.validators.js";
-import csrfProtection from "../middleware/csrf.middleware.js";
 
-authRouter.post("/register", csrfProtection, validateRegister, register);
-authRouter.post("/login", csrfProtection, validateLogin, login);
-authRouter.post("/logout", csrfProtection, logout);
-authRouter.post("/send-otp", csrfProtection, userAuth, sendVerifyOtp);
-authRouter.post("/verify-otp", csrfProtection, userAuth, verifyOtp);
-authRouter.get("/is-authenticated", csrfProtection, userAuth, isAuthenticated);
-authRouter.post("/forgot-password", csrfProtection, sendResetPasswordOtp);
-authRouter.post("/reset-password", csrfProtection, resetPassword);
+// Note: CSRF protection is handled at server level in server.js
+
+authRouter.post("/register", validateRegister, register);
+authRouter.post("/login", validateLogin, login);
+authRouter.post("/logout", logout);
+authRouter.post("/send-otp", userAuth, sendVerifyOtp);
+authRouter.post("/verify-otp", userAuth, verifyOtp);
+authRouter.get("/is-authenticated", userAuth, isAuthenticated);
+authRouter.post("/forgot-password", sendResetPasswordOtp);
+authRouter.post("/reset-password", resetPassword);
 authRouter.get("/csrf-token", (req, res) => {
   res.json({
     success: true,
