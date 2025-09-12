@@ -18,7 +18,7 @@ let useTestRoutes = false;
 // Function to get CSRF token
 const getCsrfToken = async () => {
   try {
-    const response = await axios.get(`${API_URL}/auth/csrf-token`, {
+    const response = await axios.get(`${API_URL}/csrf-token`, {
       withCredentials: true,
     });
 

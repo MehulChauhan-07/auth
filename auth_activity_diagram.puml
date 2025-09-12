@@ -1,0 +1,128 @@
+@startuml MERN_Auth_Activity
+
+title MERN Authentication System - Streamlined User Journey
+
+|#LightBlue|User|
+start
+:Access Authentication App;
+note right: Landing page with login/signup options
+
+|#LightGreen|Authentication Flow|
+if (Has Account?) then (no)
+  :Register New Account;
+  note right
+    • Validate input (Joi)
+    • Check email uniqueness
+    • Hash password (bcrypt)
+    • Send welcome email
+  end note
+  
+  |Backend System|
+  :Create User & Generate Tokens;
+  :Set Secure Cookies + Track Session;
+else (yes)
+  :Login with Credentials;
+  note right
+    • Validate credentials
+    • Check account lock status
+    • Handle failed attempts (5 max)
+  end note
+endif
+
+|Backend System|
+:Authentication Validation;
+
+if (Authentication Success?) then (no)
+  |User|
+  :Show Error & Stop;
+  stop
+else (yes)
+  if (MFA Enabled?) then (yes)
+    |User|
+    :Complete MFA Verification;
+    note right
+      TOTP/Backup Code
+      via Speakeasy
+    end note
+  endif
+  
+  :Generate JWT Tokens & Set Cookies;
+  :Track Device Session;
+endif
+
+|#LightYellow|Dashboard & Features|
+|User|
+:Access Protected Dashboard;
+
+fork
+  :Email Verification;
+  note right
+    • Generate & send OTP
+    • Validate within 15min
+    • Mark account verified
+  end note
+fork again
+  :Profile Management;
+  note right
+    • Update user info
+    • Validate changes
+    • Save to MongoDB
+  end note
+fork again
+  :MFA Setup;
+  note right
+    • Generate TOTP secret
+    • Create QR code
+    • Generate backup codes
+  end note
+fork again
+  :Password Reset;
+  note right
+    • OTP via email
+    • Validate & hash new password
+    • Invalidate all tokens
+  end note
+fork again
+  :Session Management;
+  note right
+    • View active sessions
+    • Revoke sessions
+    • Track device info
+  end note
+endfork
+
+|#LightCyan|Alternative Auth|
+if (OAuth Login?) then (yes)
+  |OAuth Provider|
+  :OAuth Flow (Google/GitHub);
+  note right
+    • Redirect to provider
+    • Get authorization
+    • Exchange for user data
+  end note
+  
+  |Backend System|
+  :Link/Create Account & Generate Tokens;
+endif
+
+|#LightPink|Session Management|
+fork
+  :Token Refresh Cycle;
+  note right
+    • Check token expiry
+    • Auto-refresh if valid
+    • Redirect to login if expired
+  end note
+fork again
+  :Secure Logout;
+  note right
+    • Clear cookies
+    • Invalidate tokens
+    • Remove session
+  end note
+endfork
+
+:End Session;
+stop
+
+@enduml
