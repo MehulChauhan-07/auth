@@ -1,0 +1,466 @@
+{
+	"info": {
+		"name": "MERN Auth - Image Generation API",
+		"description": "Test image generation endpoints with authentication",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "csrfToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Setup",
+			"item": [
+				{
+					"name": "Get CSRF Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('csrfToken', response.csrfToken);",
+									"    console.log('CSRF Token saved:', response.csrfToken.substring(0, 10) + '...');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/csrf-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["csrf-token"]
+						}
+					}
+				},
+				{
+					"name": "Register Test User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('User registered:', response.user?.name);",
+									"    pm.environment.set('testUserEmail', pm.request.body.raw ? JSON.parse(pm.request.body.raw).email : '');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Image Test User\",\n  \"email\": \"imagetest_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "register"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Image Generation",
+			"item": [
+				{
+					"name": "Demo Generation (No Auth)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('Demo Message:', response.message);",
+									"    console.log('Mock Image URL:', response.mockImage?.url);",
+									"    ",
+									"    pm.test('Demo generation successful', function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.demo).to.be.true;",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"A beautiful sunset over mountains\",\n  \"style\": \"realistic\",\n  \"size\": \"1024x1024\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/images/demo",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "demo"]
+						}
+					}
+				},
+				{
+					"name": "Generate Image - Text Prompt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('Generation Message:', response.message);",
+									"    console.log('Prompt Type:', response.confirmation?.promptType);",
+									"    console.log('Image URL:', response.image?.url);",
+									"    console.log('Credits Used:', response.usage?.creditsUsed);",
+									"    ",
+									"    // Save image ID for status check",
+									"    pm.environment.set('lastImageId', response.image?.id);",
+									"    ",
+									"    pm.test('Image generation successful', function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.image).to.be.an('object');",
+									"        pm.expect(response.confirmation.promptType).to.equal('Text Format');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"A majestic dragon flying over a medieval castle\",\n  \"style\": \"artistic\",\n  \"size\": \"1024x1024\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/images/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "generate"]
+						}
+					}
+				},
+				{
+					"name": "Generate Image - JSON Prompt",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('JSON Generation Message:', response.message);",
+									"    console.log('Prompt Type:', response.confirmation?.promptType);",
+									"    console.log('Processed Prompt:', response.confirmation?.processedPrompt);",
+									"    console.log('Image URL:', response.image?.url);",
+									"    ",
+									"    pm.test('JSON prompt generation successful', function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.confirmation.promptType).to.equal('JSON Format');",
+									"        pm.expect(response.image.promptType).to.equal('json');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"{\\\"text\\\": \\\"A futuristic cityscape at night\\\", \\\"mood\\\": \\\"cyberpunk\\\", \\\"colors\\\": [\\\"neon blue\\\", \\\"purple\\\", \\\"pink\\\"], \\\"lighting\\\": \\\"dramatic neon lighting\\\", \\\"composition\\\": \\\"wide\\\"}\",\n  \"style\": \"digital-art\",\n  \"size\": \"1792x1024\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/images/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "generate"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Image Management",
+			"item": [
+				{
+					"name": "Get Image Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('Image Status:', response.status);",
+									"    console.log('Processing Time:', response.metadata?.processingTime, 'ms');",
+									"    ",
+									"    pm.test('Status check successful', function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.status).to.be.a('string');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Use the last generated image ID or a default",
+									"const imageId = pm.environment.get('lastImageId') || 'demo-image-id';",
+									"pm.request.url = pm.request.url.toString().replace(':imageId', imageId);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/images/:imageId/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", ":imageId", "status"]
+						}
+					}
+				},
+				{
+					"name": "Get Image History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    console.log('Total Images:', response.pagination?.totalImages);",
+									"    console.log('Images in Response:', response.images?.length);",
+									"    console.log('Current Page:', response.pagination?.currentPage);",
+									"    ",
+									"    pm.test('History retrieval successful', function () {",
+									"        pm.expect(response.success).to.be.true;",
+									"        pm.expect(response.images).to.be.an('array');",
+									"        pm.expect(response.pagination).to.be.an('object');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/images/history?page=1&limit=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "history"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Error Testing",
+			"item": [
+				{
+					"name": "Invalid Prompt (Should Fail)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 400) {",
+									"    const response = pm.response.json();",
+									"    console.log('✅ Validation error handled correctly');",
+									"    console.log('Error Code:', response.error?.code);",
+									"    console.log('Validation Fields:', response.error?.fields?.length);",
+									"    ",
+									"    pm.test('Validation error handled correctly', function () {",
+									"        pm.expect(response.success).to.be.false;",
+									"        pm.expect(response.error.code).to.equal('VALIDATION_ERROR');",
+									"    });",
+									"} else {",
+									"    pm.test('Should have failed validation', function () {",
+									"        pm.expect(pm.response.code).to.equal(400);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-CSRF-Token",
+								"value": "{{csrfToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"\",\n  \"style\": \"invalid-style\",\n  \"size\": \"invalid-size\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/images/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "generate"]
+						}
+					}
+				},
+				{
+					"name": "No Authentication (Should Fail)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 401) {",
+									"    console.log('✅ Authentication required - correctly blocked');",
+									"    pm.test('Authentication required', function () {",
+									"        pm.expect(pm.response.code).to.equal(401);",
+									"    });",
+									"} else {",
+									"    pm.test('Should require authentication', function () {",
+									"        pm.expect(pm.response.code).to.equal(401);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"prompt\": \"This should fail without authentication\",\n  \"style\": \"realistic\",\n  \"size\": \"1024x1024\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/images/generate",
+							"host": ["{{baseUrl}}"],
+							"path": ["images", "generate"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

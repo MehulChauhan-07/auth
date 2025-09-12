@@ -17,6 +17,7 @@ import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import mfaRouter from "./routes/mfa.routes.js";
 import oauthRouter from "./routes/oauth.routes.js";
+import imageRouter from "./routes/image.routes.js";
 import {
   apiLimiter,
   loginLimiter,
@@ -212,6 +213,7 @@ app.use("/api/auth", oauthRouter);
 app.use("/api/user", userRouter);
 app.use("/api/mfa", mfaRouter);
 app.use("/api/session", sessionRouter);
+app.use("/api/images", imageRouter);
 
 // Global error handler
 app.use((err, req, res, next) => {
